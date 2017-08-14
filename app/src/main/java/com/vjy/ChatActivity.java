@@ -13,19 +13,16 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
-import org.java_websocket.client.WebSocketClient;
-import org.java_websocket.drafts.Draft;
-import org.java_websocket.drafts.Draft_10;
-import org.java_websocket.drafts.Draft_17;
-import org.java_websocket.handshake.ServerHandshake;
+import com.vjy.android_websocket.WebSocketClient;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class ChatActivity extends AppCompatActivity {
 
@@ -45,7 +42,8 @@ public class ChatActivity extends AppCompatActivity {
     // Client name
     private String name = null;
 
-    private WebSocketClient mWebSocketClient;
+//    private WebSocketClient mWebSocketClient;
+    private WebSocketClient client;
 
     // JSON flags to identify the kind of JSON response
     private static final String TAG_SELF = "self", TAG_NEW = "new",
@@ -94,17 +92,12 @@ public class ChatActivity extends AppCompatActivity {
             return;
         }
 
-        Draft draft = new Draft_17();
 
-        mWebSocketClient = new WebSocketClient(uri, draft) {
+        client = new com.vjy.android_websocket.WebSocketClient(uri, new com.vjy.android_websocket.WebSocketClient.Listener() {
             @Override
-            public void onOpen(ServerHandshake serverHandshake) {
-                Log.i("Websocket", "Opened");
-                showToast("connect");
-//                mWebSocketClient.send("Hello from " + Build.MANUFACTURER + " " + Build.MODEL);
+            public void onConnect() {
+
             }
-
-
 
             @Override
             public void onMessage(String s) {
@@ -117,17 +110,27 @@ public class ChatActivity extends AppCompatActivity {
                 });
             }
 
+
             @Override
-            public void onClose(int i, String s, boolean b) {
-                Log.i("Websocket", "Closed " + s);
+            public void onDisconnect(int code, String reason) {
+                String message = String.format(Locale.US,
+                        "Disconnected! Code: %d Reason: %s", code, reason);
+
+                showToast(message);
+
+                // clear the session id from shared preferences
+                utils.storeSessionId(null);
             }
 
             @Override
-            public void onError(Exception e) {
-                Log.i("Websocket", "Error " + e.getMessage());
+            public void onError(Exception error) {
+                Log.e(TAG, "Error! : " + error);
+
+                showToast("Error! : " + error);
             }
-        };
-        mWebSocketClient.connect();
+        });
+
+        client.connect();
     }
 
 
@@ -137,8 +140,8 @@ public class ChatActivity extends AppCompatActivity {
      * Method to send message to web socket server
      * */
     private void sendMessageToServer(String message) {
-        if (mWebSocketClient != null) {
-            mWebSocketClient.send(message);
+        if (client != null && client.isConnected() ) {
+            client.send(message);
         }
     }
 
@@ -215,8 +218,8 @@ public class ChatActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
 
-        if(mWebSocketClient != null){
-            mWebSocketClient.close();
+        if(client != null && client.isConnected()){
+            client.disconnect();
         }
     }
 
